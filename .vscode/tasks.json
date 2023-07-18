@@ -6,10 +6,12 @@
         {
             "label": "Build nobuild",
             "type": "shell",
-            "command": "zig cc -std=c11 -o nobuild.exe -ITools nobuild.c -fno-sanitize=undefined -target x86_64-windows",
-            "problemMatcher": [
-                "$msCompile"
-            ],
+            "windows": {
+                "command": "zig cc --debug -std=c11 -o nobuild.exe -ITools nobuild.c -fno-sanitize=undefined -fno-omit-frame-pointer -target x86_64-windows",
+                "problemMatcher": [
+                    "$msCompile"
+                ],
+            },
             "group": "build"
         }
     ]

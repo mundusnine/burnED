@@ -5,13 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "(nobuild) Launch",
             "type": "cppvsdbg",
             "request": "launch",
-            "name": "Debug Build",
-            "program": "${workspaceFolder}/nobuild.exe",
+            "windows": {
+                "program": "${workspaceFolder}/nobuild.exe",
+                "console": "integratedTerminal",
+            },
             "args": [],
-            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}",
             "preLaunchTask": "Build nobuild"
-        }
+        },
     ]
 }
