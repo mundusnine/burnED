@@ -1,3 +1,9 @@
 [submodule "Tools"]
 	path = Tools
 	url = https://github.com/mundusnine/zig-bin-monorepo.git
+[submodule "Libraries/fenster"]
+	path = Libraries/fenster
+	url = git@github.com:foundry2D/fenster.git
+[submodule "Libraries/microui"]
+	path = Libraries/microui
+	url = git@github.com:foundry2D/microui.git

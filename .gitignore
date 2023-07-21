@@ -1,4 +1,9 @@
+compile_commands*.json
 *.pdb
 *.exe
 *.lib
 *.txt
+nobuild
+Deployment/**
+!Deployment/assets
+!Deployment/assets/**

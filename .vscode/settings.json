@@ -1,5 +1,22 @@
 {
     "files.associations": {
-        "nobuild.h": "c"
+        "nobuild.h": "c",
+        "*.inc": "c",
+        "cerrno": "c",
+        "hash_map": "c",
+        "map": "c",
+        "set": "c",
+        "unordered_map": "c",
+        "unordered_set": "c",
+        "bitset": "c",
+        "stdint.h": "c",
+        "objc-runtime.h": "c",
+        "stdio.h": "c",
+        "renderer.h": "c",
+        "stb_truetype.h": "c",
+        "xlib.h": "c",
+        "microui.h": "c",
+        "fenster.h": "c",
+        "cstdint": "c"
     }
 }

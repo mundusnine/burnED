@@ -4,12 +4,33 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Build burnED",
+            "type": "shell",
+            "command": "./nobuild",
+            "problemMatcher": [
+                "$zig"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn":[
+                "Build nobuild"
+            ]
+        },
+        {
             "label": "Build nobuild",
             "type": "shell",
             "windows": {
                 "command": "zig cc --debug -std=c11 -o nobuild.exe -ITools nobuild.c -fno-sanitize=undefined -fno-omit-frame-pointer -target x86_64-windows",
                 "problemMatcher": [
-                    "$msCompile"
+                    "$zig"
+                ],
+            },
+            "linux": {
+                "command": "Tools/FoundryTools_linux_x64/zig cc --debug -std=c11 -o nobuild -ITools nobuild.c -fno-sanitize=undefined -fno-omit-frame-pointer -target x86_64-linux-musl",
+                "problemMatcher": [
+                    "$zig"
                 ],
             },
             "group": "build"
