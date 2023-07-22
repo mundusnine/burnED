@@ -12,7 +12,7 @@
 #define CELL_SIZE 96
 #define COMMAND_BUF_SIZE (1024 * 512)
 
-enum { FREE_FONT, SET_CLIP, DRAW_TEXT, DRAW_LINE, DRAW_RECT, DRAW_TRIANGLE, DRAW_CIRCLE };
+enum { FREE_FONT, SET_CLIP, DRAW_TEXT, DRAW_LINE, DRAW_RECT, DRAW_IMG, DRAW_TRIANGLE, DRAW_CIRCLE };
 
 typedef struct {
   int type, size;
@@ -20,6 +20,7 @@ typedef struct {
   RenRect rect;
   RenColor color;
   RenFont *font;
+  RenImage* image;
   int tab_width;
   char text[0];
 } Command;
@@ -127,6 +128,18 @@ void rencache_draw_rect(RenRect rect, RenColor color) {
   if (cmd) {
     cmd->rect = rect;
     cmd->color = color;
+  }
+}
+void rencache_draw_img(RenImage* img,RenRect sub,int x, int y,RenColor color){
+  RenRect rect = {.x=x,.y=y,.width=sub.width,.height=sub.height};
+  if (!rects_overlap(screen_rect, rect)) { return; }
+  Command *cmd = push_command(DRAW_IMG, sizeof(Command));
+  if (cmd) {
+    cmd->rect = sub;
+    cmd->color = color;
+    cmd->x0 = x;
+    cmd->y0 = y;
+    cmd->image = img;
   }
 }
 
@@ -309,7 +322,8 @@ void rencache_end_frame(void) {
     /* draw */
     RenRect r = rect_buf[i];
     ren_set_clip_rect(r);
-
+    RenColor col = {0};
+    col.b = col.a = col.g = col.r = 255;
     cmd = NULL;
     while (next_command(&cmd)) {
       switch (cmd->type) {
@@ -321,6 +335,9 @@ void rencache_end_frame(void) {
           break;
         case DRAW_RECT:
           ren_fill_rect(cmd->rect, cmd->color);
+          break;
+        case DRAW_IMG:
+          ren_draw_image(cmd->image,&cmd->rect,cmd->x0,cmd->y0,cmd->color);
           break;
         case DRAW_TEXT:
           ren_set_font_tab_width(cmd->font, cmd->tab_width);

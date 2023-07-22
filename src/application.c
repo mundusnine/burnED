@@ -3,6 +3,9 @@
 
 #include "application.h"
 #include "microui.h"
+
+#include "iconTimes.h"
+
 static  char logbuf[64000];
 static   int logbuf_updated = 0;
 static float bg[3] = { 90, 95, 100 };
@@ -14,7 +17,7 @@ static void write_log(const char *text) {
   logbuf_updated = 1;
 }
 
-
+static mu_Rect last_win = {0};
 static void test_window(mu_Context *ctx) {
   /* do window */
   if (mu_begin_window(ctx, "Demo Window", mu_rect(40, 40, 300, 450))) {
@@ -203,11 +206,12 @@ static void process_frame(mu_Context *ctx) {
 
 mu_Context* ctx;
 int64_t now = 0;
+int t_last_x = 0;
 int text_width(mu_Font font, const char *str, int len){
-    return 10;//ren_get_font_width((RenFont*)font,str);
+    return ren_get_font_width((RenFont*)font,str);
 }
 int text_height(mu_Font font){
-    return 10;//ren_get_font_height((RenFont*)font);
+    return ren_get_font_height((RenFont*)font);
 }
 void application_init(void){
     now = fenster_time();
@@ -215,14 +219,18 @@ void application_init(void){
     mu_init(ctx);
     ctx->text_width = text_width ;
     ctx->text_height = text_height;
+    ctx->style->font = ren_load_font("assets/fonts/font.ttf",14);
 }
 RenColor color = {.r=255,.b=0,.g=0,.a=255};
+RenRect window_rect = {0};
+RenColor bg_color = {.r=0,.b=0,.g=0,.a=255};
 int y =100;
 int last_x,last_y = 0;
 int keys_state[128] = {0};
 int mouse_state[3] = {0};
 void application_update(fenster_window* f){
-
+    window_rect.width = f->width;
+    window_rect.height = f->height;
     int has_keys = 0;
     char s[32] = {0};
     char *p = s;
@@ -272,25 +280,32 @@ void application_update(fenster_window* f){
 
     process_frame(ctx);
 
+    // rencache_show_debug(true);
     rencache_begin_frame();
+    rencache_draw_rect(window_rect,*(RenColor*)&ctx->style->colors[MU_COLOR_WINDOWBG]);
     mu_Command *cmd = NULL;
     while (mu_next_command(ctx, &cmd)) {
       switch (cmd->type) {
         case MU_COMMAND_TEXT: 
-            // RenColor color = {.a=cmd->text.color.a,.r=cmd->text.color.r,.g=cmd->text.color.g,.b= cmd->text.color.b};
-            // rencache_draw_text(NULL,cmd->text.str, cmd->text.pos.x,cmd->text.pos.y, *(RenColor*)&color);
+            rencache_draw_text(ctx->style->font,cmd->text.str, cmd->text.pos.x,cmd->text.pos.y, *(RenColor*)&cmd->text.color);
             break;
         case MU_COMMAND_RECT:
-            // RenColor color = {.a=cmd->text.color.a,.r=cmd->text.color.r,.g=cmd->text.color.g,.b= cmd->text.color.b};
             rencache_draw_rect(*(RenRect*)&cmd->rect.rect, *(RenColor*)&cmd->rect.color);
             break;
         case MU_COMMAND_ICON:
+            if(cmd->icon.id == MU_ICON_CLOSE || cmd->icon.id == MU_ICON_CHECK){
+              RenImage img = {0};
+              img.pixels = icon_close_pixels;
+              img.width = icon_close_width;
+              img.height = icon_close_height;
+              RenRect sub = {0,0,icon_close_width,icon_close_height};
+              rencache_draw_img(&img,sub,cmd->rect.rect.x,cmd->rect.rect.y,*(RenColor*)&cmd->icon.color);
+            }
             // r_icon(cmd->icon.id, cmd->icon.rect, cmd->icon.color);
             break;
         case MU_COMMAND_CLIP: rencache_set_clip_rect(*(RenRect*)&cmd->clip.rect); break;
       }
     }
-    // rencache_show_debug(true);
     // RenRect temp = {0};
     // temp.x = temp.y = temp.height = temp.width = 100;
     // // rencache_draw_circle(100,100,20,color);

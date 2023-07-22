@@ -4,6 +4,7 @@ compile_commands*.json
 *.lib
 *.txt
 nobuild
+assets/build/**
 Deployment/**
 !Deployment/assets
 !Deployment/assets/**

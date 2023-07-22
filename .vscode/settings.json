@@ -17,6 +17,11 @@
         "xlib.h": "c",
         "microui.h": "c",
         "fenster.h": "c",
-        "cstdint": "c"
+        "cstdint": "c",
+        "*.tcc": "c",
+        "format": "c",
+        "limits": "c",
+        "stdexcept": "c",
+        "regex": "c"
     }
 }

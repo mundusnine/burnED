@@ -8,11 +8,6 @@
 
 #define MAX_GLYPHSET 256
 
-struct RenImage {
-  RenColor *pixels;
-  int width, height;
-};
-
 typedef struct {
   RenImage *image;
   stbtt_bakedchar glyphs[256];

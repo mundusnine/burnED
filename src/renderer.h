@@ -13,6 +13,10 @@ typedef struct RenFont RenFont;
 typedef struct { uint8_t b, g, r, a; } RenColor;
 typedef struct { int x, y, width, height; } RenRect;
 
+struct RenImage {
+  RenColor *pixels;
+  int width, height;
+};
 
 void ren_init(fenster_window *win);
 void ren_update_rects(RenRect *rects, int count);

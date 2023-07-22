@@ -40,7 +40,7 @@ Cstr_Array libraries = {
 Cstr_Array includeDirs = {0};
 Cstr_Array defines = {0};
 
-Cstr_Array make_compile_line(void){
+Cstr_Array get_compiler(void){
     // "-MJ","compile_commands.json" waiting for https://github.com/ziglang/zig/issues/9323 to be fixed
     #ifdef _WIN32
     Cstr_Array comp = cstr_array_make("Tools/FoundryTools_windows_x64/zig.exe","cc");
@@ -54,51 +54,103 @@ Cstr_Array make_compile_line(void){
     // Cstr_Array comp = CSTR_ARRAY_MAKE("clang","-lm","-gen-cdb-fragment-path","cdb");
     comp = cstr_array_append(comp,"-L/usr/lib64");
     #endif
+    return comp;
+}
+
+void addIncludes(Cstr_Array* curr,char** includes,size_t len){
+    Cstr_Array comp = {0};
+    for(int i = 0; i < len;++i){
+        size_t size = strlen(includes[i]) + 3;
+        char* temp = allocate(size);
+        snprintf(temp,size,"-I%s",includes[i]);
+        comp = cstr_array_append(comp,temp);
+    }
+    *curr = cstr_array_concat(*curr,comp);
+}
+
+#ifdef __APPLE__
+const char* link_name = "-framework";
+const size_t link_name_len = 10;
+#else
+const char* link_name = "-l";
+const size_t link_name_len = 2;
+#endif
+void addLibraries(Cstr_Array* curr, char** libraries,size_t len){
+    Cstr_Array comp = {0};
+    for(int i = 0; i < len;++i){
+        size_t size = strlen(libraries[i]) + link_name_len +1;
+        char* temp = allocate(size);
+        snprintf(temp,size,"%s%s",link_name,libraries[i]);
+        comp = cstr_array_append(comp,temp);
+    }
+    *curr = cstr_array_concat(*curr,comp);
+}
+
+void addDefines(Cstr_Array* curr, char** defines,size_t len){
+    Cstr_Array comp = {0};
+    for(int i = 0; i < len;++i){
+        size_t size = strlen(defines[i]) + 3;
+        char* temp = allocate(size);
+        snprintf(temp,size,"-D%s",defines[i]);
+        comp = cstr_array_append(comp,temp);
+    }
+    *curr = cstr_array_concat(*curr,comp);
+}
+
+Cstr_Array make_compile_line(void){
+    
+    Cstr_Array comp = get_compiler();
 
     // defines = cstr_array_append(defines,"__STDC_LIMIT_MACROS_DEFINED_BY_CLANG");
-    for(int i = 0; i < defines.count;++i){
-        size_t size = strlen(defines.elems[i]) + 3;
-        char* temp = allocate(size);
-        snprintf(temp,size,"-D%s",defines.elems[i]);
-        comp = cstr_array_append(comp,temp);
-    }
+    
 
-    includeDirs = cstr_array_append(includeDirs,"Libraries/fenster");
-    includeDirs = cstr_array_append(includeDirs,"Libraries/microui/src");
-    includeDirs = cstr_array_append(includeDirs,"Libraries/stb");
+    char* includes[] ={
+        "assets/build",
+        "Libraries/fenster",
+        "Libraries/microui/src",
+        "Libraries/stb"
+    };
+    addIncludes(&comp,includes,sizeof(includes)/sizeof(char*));
 
-    for(int i = 0; i < includeDirs.count;++i){
-        size_t size = strlen(includeDirs.elems[i]) + 3;
-        char* temp = allocate(size);
-        snprintf(temp,size,"-I%s",includeDirs.elems[i]);
-        comp = cstr_array_append(comp,temp);
-    }
-    for(int i = 0; i < libraries.count;++i){
-        #ifdef __APPLE__
-        const char* link_name = "-framework";
-        #else
-        const char* link_name = "-l";
-        #endif
-        size_t size = strlen(libraries.elems[i]) + strlen(link_name)+1;
-        char* temp = allocate(size);
-        snprintf(temp,size,"%s%s",link_name,libraries.elems[i]);
-        comp = cstr_array_append(comp,temp);
-    }
+    addLibraries(&comp,libraries.elems,libraries.count);
+
+    
 
     return comp;
 }
 
 void build_tools(void)
 {
-    // MKDIRS("build", "tools");
-    // CMD("clang", COMMON_CFLAGS, "-o", "./build/tools/png2c", "./tools/png2c.c", "-lm");
-    // CMD("clang", COMMON_CFLAGS, "-o", "./build/tools/obj2c", "./tools/obj2c.c", "-lm");
+    MKDIRS("Deployment", "tools");
+    Cmd cmd = {0};
+    cmd.line = get_compiler();
+    char* includes[] ={
+        "Tools/includes",
+    };
+    addIncludes(&cmd.line,includes,sizeof(includes)/sizeof(char*));
+    char* libs[] ={
+        "m",
+    };
+    addLibraries(&cmd.line,libs,sizeof(libs)/sizeof(char*));
+    cmd.line = cstr_array_append(cmd.line,"--debug");
+    cmd.line = cstr_array_append(cmd.line,"-o");
+    cmd.line = cstr_array_append(cmd.line,"./Deployment/tools/png2c");
+    cmd.line = cstr_array_append(cmd.line,"./Tools/png2c/png2c.c");
+
+    cmd.line = cstr_array_append(cmd.line,"-fno-sanitize=undefined");
+
+
+    cmd.line = cstr_array_append(cmd.line,"-target");
+    cmd.line = cstr_array_append(cmd.line,libc);
+    
+    INFO("CMD: %s", cmd_show(cmd));
+    cmd_run_sync(cmd);
 }
 
 void build_assets(void)
 {
-    // MKDIRS("build", "assets");
-    // CMD("./build/tools/png2c", "-n", "tsodinPog", "-o", "./build/assets/tsodinPog.c", "./assets/tsodinPog.png");
+    MKDIRS("assets","build");
+    CMD("./Deployment/tools/png2c", "-n", "icon_close", "-o", "./assets/build/iconTimes.h", "./assets/times-solid.png");
     // CMD("./build/tools/png2c", "-n", "tsodinCup", "-o", "./build/assets/tsodinCup.c", "./assets/tsodinCup.png");
     // CMD("./build/tools/png2c", "-n", "oldstone", "-o", "./build/assets/oldstone.c", "./assets/oldstone.png");
     // CMD("./build/tools/png2c", "-n", "lavastone", "-o", "./build/assets/lavastone.c", "./assets/lavastone.png");
@@ -118,7 +170,7 @@ void usage(const char *program)
     INFO("    clangd");
     INFO("        clangd'eznuts i.e. Output compile_commands.json.");
     INFO("    tools");
-    INFO("        Build all the tools. Things like png2c, obj2c, etc.");
+    INFO("        Build all the tools. Things like png2c, etc.");
     INFO("    assets");
     INFO("        Build the assets in the assets/ folder.");
     INFO("        Basically convert their data to C code so we can bake them in the editor.");
@@ -188,6 +240,8 @@ void build_editor(int is_musl){
 
     foreach_file_in_dir("./src",addSources,&cmd);
     foreach_file_in_dir("Libraries/microui/src",addSources,&cmd);
+
+    foreach_file_in_dir("assets/build",addSources,&cmd);
     
     // FOREACH_FILE_IN_DIR(file, , {
 
@@ -236,6 +290,8 @@ int main(int argc, char** argv){
             build_assets();
         }
     }
+    build_tools();
+    build_assets();
     build_editor(link_musl);
 
     return 0;
