@@ -4,7 +4,7 @@
 #include "application.h"
 #include "microui.h"
 
-#include "iconTimes.h"
+#include "icons.h"
 
 static  char logbuf[64000];
 static   int logbuf_updated = 0;
@@ -293,13 +293,17 @@ void application_update(fenster_window* f){
             rencache_draw_rect(*(RenRect*)&cmd->rect.rect, *(RenColor*)&cmd->rect.color);
             break;
         case MU_COMMAND_ICON:
-            if(cmd->icon.id == MU_ICON_CLOSE || cmd->icon.id == MU_ICON_CHECK){
-              RenImage img = {0};
-              img.pixels = icon_close_pixels;
-              img.width = icon_close_width;
-              img.height = icon_close_height;
-              RenRect sub = {0,0,icon_close_width,icon_close_height};
-              rencache_draw_img(&img,sub,cmd->rect.rect.x,cmd->rect.rect.y,*(RenColor*)&cmd->icon.color);
+            if(cmd->icon.id < 5){
+              static RenImage imgs[] = {
+                {0},
+                {.pixels=icon_close_pixels,.width=icon_close_width,.height=icon_close_height},
+                {.pixels=icon_close_pixels,.width=icon_close_width,.height=icon_close_height},
+                {.pixels=icon_collapsed_pixels,.width=icon_collapsed_width,.height=icon_collapsed_height},
+                {.pixels=icon_expanded_pixels,.width=icon_expanded_width,.height=icon_expanded_height},
+              };
+              RenImage img = imgs[cmd->icon.id];
+              RenRect sub = {0,0,img.width,img.height};
+              rencache_draw_img(&imgs[cmd->icon.id],sub,cmd->rect.rect.x,cmd->rect.rect.y,*(RenColor*)&cmd->icon.color);
             }
             // r_icon(cmd->icon.id, cmd->icon.rect, cmd->icon.color);
             break;

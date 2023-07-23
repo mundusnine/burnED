@@ -150,7 +150,10 @@ void build_tools(void)
 void build_assets(void)
 {
     MKDIRS("assets","build");
-    CMD("./Deployment/tools/png2c", "-n", "icon_close", "-o", "./assets/build/iconTimes.h", "./assets/times-solid.png");
+    RM("./assets/build/icons.h");
+    CMD("./Deployment/tools/png2c", "-n", "icon_close", "-o", "./assets/build/icons.h", "./assets/times-solid.png");
+    CMD("./Deployment/tools/png2c", "-n", "icon_expanded", "-o", "./assets/build/icons.h", "./assets/minus.png");
+    CMD("./Deployment/tools/png2c", "-n", "icon_collapsed", "-o", "./assets/build/icons.h", "./assets/plus.png");
     // CMD("./build/tools/png2c", "-n", "tsodinCup", "-o", "./build/assets/tsodinCup.c", "./assets/tsodinCup.png");
     // CMD("./build/tools/png2c", "-n", "oldstone", "-o", "./build/assets/oldstone.c", "./assets/oldstone.png");
     // CMD("./build/tools/png2c", "-n", "lavastone", "-o", "./build/assets/lavastone.c", "./assets/lavastone.png");
