@@ -213,7 +213,7 @@ int rencache_draw_text(RenFont *font, const char *text, int x, int y, RenColor c
   RenRect rect;
   rect.x = x;
   rect.y = y;
-  rect.width = ren_get_font_width(font, text);
+  rect.width = ren_get_font_width(font, text,-1);
   rect.height = ren_get_font_height(font);
 
   if (rects_overlap(screen_rect, rect)) {

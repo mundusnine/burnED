@@ -195,12 +195,277 @@ static void style_window(mu_Context *ctx) {
   }
 }
 
+// int mu_multiline_textbox_raw(mu_Context *ctx, char *buf, int bufsz, mu_Rect r,int opt)
+// {
+//   mu_Id id = mu_get_id(ctx, &buf, sizeof(buf));
+//   int res = 0;
+//   mu_update_control(ctx, id, r, opt | MU_OPT_HOLDFOCUS);
+
+//   if (ctx->focus == id) {
+//     /* handle text input */
+//     int len = strlen(buf);
+//     int n = mu_min(bufsz - len - 1, (int) strlen(ctx->input_text));
+//     if (n > 0) {
+//       memcpy(buf + len, ctx->input_text, n);
+//       len += n;
+//       buf[len] = '\0';
+//       res |= MU_RES_CHANGE;
+//     }
+//     /* handle backspace */
+//     if (ctx->key_pressed & MU_KEY_BACKSPACE && len > 0) {
+//       /* skip utf-8 continuation bytes */
+//       while ((buf[--len] & 0xc0) == 0x80 && len > 0);
+//       buf[len] = '\0';
+//       res |= MU_RES_CHANGE;
+//     }
+//     /* handle return */
+//     if (ctx->key_pressed & MU_KEY_RETURN) {
+//       mu_set_focus(ctx, 0);
+//       res |= MU_RES_SUBMIT;
+//     }
+//   }
+
+//   /* draw */
+//   mu_draw_control_frame(ctx, id, r, MU_COLOR_BASE, opt);
+//   if (ctx->focus == id) {
+//     mu_Color color = ctx->style->colors[MU_COLOR_TEXT];
+//     mu_Font font = ctx->style->font;
+//     int textw = ctx->text_width(font, buf, -1);
+//     int texth = ctx->text_height(font);
+//     int ofx = r.w - ctx->style->padding - textw - 1;
+//     int textx = r.x + mu_min(ofx, ctx->style->padding);
+//     int texty = r.y + (r.h - texth) / 2;
+//     mu_push_clip_rect(ctx, r);
+//     mu_draw_text(ctx, font, buf, -1, mu_vec2(textx, texty), color);
+//     mu_draw_rect(ctx, mu_rect(textx + textw, texty, 1, texth), color);
+//     mu_pop_clip_rect(ctx);
+//   } else {
+//     // strstr()
+//     mu_draw_control_text(ctx, buf, r, MU_COLOR_TEXT, opt);
+//   }
+
+//   return res;
+// }
+
+    // char* sub = start;
+    // memset(line,0,2048);
+    // memcpy(line,sub,size);
+    // mu_Id id = mu_get_id(ctx, &start, sizeof(size));
+    // int adder = 1;
+    // if(mu_textbox_raw(ctx, line, 2048,id,r, opt) & MU_RES_CHANGE){
+    //   size_t end_len = strlen(line);
+    //   if(end_len < size){
+    //     while(sub[end_len] != '\0'){
+    //       sub[end_len++] = sub[end_len+1];
+    //     }
+    //     adder = 0;
+    //   }
+    //   else {
+    //     size_t write = end_len;
+    //     char keep = sub[end_len-1];
+    //     while(keep !='\0'){
+    //       char nk = sub[end_len]; 
+    //       sub[end_len++] = keep;
+    //       keep = nk;
+    //     }
+    //     memcpy(sub,line,write);
+    //     adder +=1;
+    //   }
+    //   return 1;
+    // }
+    // mu_draw_text(ctx, font, " ", 1, mu_vec2(r.x, r.y), color);
+
+typedef struct {
+  char* text;
+  size_t len;
+  mu_Rect r;
+}
+data_text_t;
+
+int mu_multiline_textbox_ex(mu_Context *ctx, char *buf, int bufsz, int opt) {
+  mu_Container* cnt = mu_get_current_container(ctx);
+  char *start, *end, *p = buf;
+  int width = -1;
+  mu_Font font = ctx->style->font;
+  mu_Color color = ctx->style->colors[MU_COLOR_TEXT];
+  
+  mu_layout_begin_column(ctx);
+  // mu_layout_row(ctx, 1, &width, ctx->text_height(font));
+  mu_layout_row(ctx, 1, (int[]) { -1}, ctx->text_height(font));
+  mu_Rect init_rect = mu_layout_next(ctx);
+  init_rect.w = cnt->body.w - ctx->style->padding * 2;
+  mu_Rect last = init_rect;
+  mu_Id id = mu_get_id(ctx, &buf, sizeof(buf));
+  data_text_t data[1024] = {0};
+  size_t d_len = 0;
+  do {
+    data_text_t* node = &data[d_len++];
+    int w = 0;
+    start = end = p;
+    char line[2048] = {0};
+    mu_Rect r = last;
+    init_rect.h = r.y - init_rect.y + r.h;
+    r.w = r.w < init_rect.w ? init_rect.w : r.w;
+    node->r = r;
+    do {
+      const char* word = p;
+      while (*p && *p != '\n') { p++; }
+      w += ctx->text_width(font, word, p - word);
+      if (w > r.w && end != start) { break; }
+      w += ctx->text_width(font, p, 1);
+      end = p++;
+    } while (*end && *end != '\n');
+
+    size_t size = p != start ? end - start: 1;
+    node->len = size;
+    node->text = start;
+    p = end + 1;
+    last = mu_layout_next(ctx);
+  } while (*end);
+
+  int res =0;
+  mu_update_control(ctx, id, init_rect, opt | MU_OPT_HOLDFOCUS);
+  mu_draw_control_frame(ctx, id, init_rect, MU_COLOR_BASE, opt);
+  for(int i =0; i < d_len;++i){
+    data_text_t node = data[i];
+    mu_Rect r = node.r; 
+    if (ctx->focus == id) {
+      static mu_Vec2 m_pos = {0};
+      /* handle text input */
+      int len = strlen(buf);
+      int n = mu_min(bufsz - len - 1, (int) strlen(ctx->input_text));
+      if (n > 0) {
+        memcpy(buf + len, ctx->input_text, n);
+        len += n;
+        buf[len] = '\0';
+        res |= MU_RES_CHANGE;
+      }
+      /* handle backspace */
+      if (ctx->key_pressed & MU_KEY_BACKSPACE && len > 0) {
+        /* skip utf-8 continuation bytes */
+        while ((buf[--len] & 0xc0) == 0x80 && len > 0);
+        buf[len] = '\0';
+        res |= MU_RES_CHANGE;
+      }
+      /* handle return */
+      if (ctx->key_pressed & MU_KEY_RETURN) {
+        mu_set_focus(ctx, 0);
+        res |= MU_RES_SUBMIT;
+      }
+
+      if(ctx->mouse_down){
+        m_pos = ctx->mouse_pos;
+      }
+      mu_Color color = ctx->style->colors[MU_COLOR_TEXT];
+      mu_Font font = ctx->style->font;
+      int textw = ctx->text_width(font, node.text,node.len);
+      int offsetx = m_pos.x - r.x;
+      int width = 0;
+      for(int i =0; i < node.len;++i){
+        char temp[2] = {0};
+        temp[0] = node.text[i];
+        int nwidth = ctx->text_width(font, temp,1); 
+        if(offsetx < width+ nwidth){
+          offsetx = width;
+          break;
+        }
+        width+= nwidth;
+      }
+      offsetx = textw < offsetx ? textw : offsetx;
+      int texth = ctx->text_height(font);
+      int ofx = r.w - textw - 1;
+      int textx = r.x + mu_min(ofx, ctx->style->padding);
+      int texty = r.y + (r.h - texth) / 2;
+      mu_push_clip_rect(ctx, r);
+      mu_draw_text(ctx, font, node.text, node.len, mu_vec2(textx, texty), color);
+      if(r.x + r.w > m_pos.x && r.x <= m_pos.x && r.y <= m_pos.y && r.y + r.h > m_pos.y){
+        mu_draw_rect(ctx, mu_rect(textx + offsetx, texty, 1, texth), color);
+      } 
+      mu_pop_clip_rect(ctx);
+    }
+    else {
+      mu_Vec2 pos;
+      int tw = ctx->text_width(font, node.text, node.len);
+      mu_push_clip_rect(ctx, r);
+      pos.y = r.y + (r.h - ctx->text_height(font)) / 2;
+      if (opt & MU_OPT_ALIGNCENTER) {
+        pos.x = r.x + (r.w - tw) / 2;
+      } else if (opt & MU_OPT_ALIGNRIGHT) {
+        pos.x = r.x + r.w - tw - ctx->style->padding;
+      } else {
+        pos.x = r.x + ctx->style->padding;
+      }
+      mu_draw_text(ctx, font, node.text,node.len, mu_vec2(r.x, r.y), color);
+      mu_pop_clip_rect(ctx);
+    }
+  }
+  mu_layout_end_column(ctx);
+
+  return res;
+}
+// int mu_multiline_textbox_ex(mu_Context *ctx, char *buf, int bufsz, int opt) {
+//   size_t first = 0;
+//   size_t last = 0;
+//   char line[2048] = {0};
+//   size_t buflen = strlen(buf);
+//   while(last != buflen+1){
+//     if(buf[last] == '\n' || last == buflen){
+//       size_t size = 1;
+//       if(last != first){
+//         size = last-first;
+//       }
+//       char* sub = &buf[first];
+//       first = last+1;
+//       memset(line,0,2048);
+//       memcpy(line,sub,size);
+//       mu_layout_row(ctx, 1, (int[]) { -1,-1 }, 0);
+//       mu_Id id = mu_get_id(ctx, &sub, sizeof(size));
+//       mu_Rect r = mu_layout_next(ctx);
+//       if(mu_textbox_raw(ctx, line, 2048,id,r, opt) & MU_RES_CHANGE){
+//         size_t end_len = strlen(line);
+//         if(end_len < size){
+//           while(sub[end_len] != '\0'){
+//             sub[end_len++] = sub[end_len+1];
+//           }
+//           buflen--;
+//         }
+//         else {
+//           size_t write = end_len;
+//           char keep = sub[end_len-1];
+//           while(keep !='\0'){
+//             char nk = sub[end_len]; 
+//             sub[end_len++] = keep;
+//             keep = nk;
+//           }
+//           memcpy(sub,line,write);
+//           buflen++;
+//         }
+//         return 1;
+//       }
+//     }
+//     last++;
+//   }
+//   return 1;
+//   // mu_Id id = mu_get_id(ctx, &buf, sizeof(buf));
+//   // mu_Rect r = mu_layout_next(ctx);
+//   // return mu_textbox_raw(ctx, buf, bufsz,id,r, opt);
+// }
+
+static char* lorem_text = NULL;
+static void texteditor_window(mu_Context *ctx){
+  if (mu_begin_window(ctx, "Text Editor", mu_rect(650, 250, 300, 240))){
+    mu_multiline_textbox_ex(ctx,lorem_text,sizeof(char) * 2048 *2,0);
+    mu_end_window(ctx);
+  }
+}
+
 
 static void process_frame(mu_Context *ctx) {
   mu_begin(ctx);
   style_window(ctx);
   log_window(ctx);
   test_window(ctx);
+  texteditor_window(ctx);
   mu_end(ctx);
 }
 
@@ -208,18 +473,37 @@ mu_Context* ctx;
 int64_t now = 0;
 int t_last_x = 0;
 int text_width(mu_Font font, const char *str, int len){
-    return ren_get_font_width((RenFont*)font,str);
+  return ren_get_font_width((RenFont*)font,str,len);
 }
 int text_height(mu_Font font){
-    return ren_get_font_height((RenFont*)font);
+  return ren_get_font_height((RenFont*)font);
 }
+int key_conversion[128] = {0};
 void application_init(void){
-    now = fenster_time();
-    ctx = malloc(sizeof(mu_Context));
-    mu_init(ctx);
-    ctx->text_width = text_width ;
-    ctx->text_height = text_height;
-    ctx->style->font = ren_load_font("assets/fonts/font.ttf",14);
+  lorem_text = malloc(sizeof(char) * 2048 *2);
+  /*
+  "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Quis eleifend quam adipiscing vitae proin sagittis nisl rhoncus mattis. Scelerisque felis imperdiet proin fermentum leo vel orci porta. In hac habitasse platea dictumst vestibulum rhoncus est. Ullamcorper sit amet risus nullam eget felis. Condimentum id venenatis a condimentum vitae sapien pellentesque habitant. Feugiat sed lectus vestibulum mattis ullamcorper velit sed. Aliquam id diam maecenas ultricies mi. Justo eget magna fermentum iaculis eu non diam. Ac tortor vitae purus faucibus ornare suspendisse. Dui vivamus arcu felis bibendum ut tristique et egestas quis. Orci nulla pellentesque dignissim enim sit amet venenatis. Sit amet consectetur adipiscing elit ut aliquam purus. Quis vel eros donec ac odio tempor orci dapibus. Maecenas pharetra convallis posuere morbi leo urna molestie. Auctor augue mauris augue neque gravida in fermentum et. Hac habitasse platea dictumst vestibulum rhoncus est. Et netus et malesuada fames ac turpis egestas.\n\n
+  Lectus vestibulum mattis ullamcorper velit sed ullamcorper morbi tincidunt. Diam quis enim lobortis scelerisque fermentum dui faucibus. Nullam non nisi est sit amet facilisis magna etiam. Amet aliquam id diam maecenas ultricies mi. Risus commodo viverra maecenas accumsan lacus vel facilisis volutpat est. Arcu cursus euismod quis viverra nibh cras pulvinar. Sapien eget mi proin sed libero enim sed faucibus turpis. Ipsum suspendisse ultrices gravida dictum fusce ut. Velit aliquet sagittis id consectetur purus. Condimentum vitae sapien pellentesque habitant morbi tristique senectus. Felis eget nunc lobortis mattis aliquam faucibus purus in massa. Scelerisque purus semper eget duis at tellus. Quam adipiscing vitae proin sagittis nisl. Nibh ipsum consequat nisl vel. Quis viverra nibh cras pulvinar mattis nunc.\n\n
+  Sed augue lacus viverra vitae congue eu consequat ac. Amet consectetur adipiscing elit pellentesque habitant morbi tristique senectus. Dolor purus non enim praesent elementum facilisis leo. Libero justo laoreet sit amet cursus. Proin fermentum leo vel orci porta non pulvinar neque. Imperdiet massa tincidunt nunc pulvinar sapien et. Placerat vestibulum lectus mauris ultrices eros in cursus. Curabitur vitae nunc sed velit. Augue lacus viverra vitae congue eu consequat ac felis. Lorem ipsum dolor sit amet."
+  */
+  strcpy(lorem_text,
+  "Hello World !\n\n"
+  "This is a test yo.\n\n"
+  "Me love you long time.");
+  for(int i =0; i < 128;++i){
+    if(i == 10){
+      key_conversion[i] = MU_KEY_RETURN;
+    }
+    else {
+      key_conversion[i] =i;
+    }
+  }
+  now = fenster_time();
+  ctx = malloc(sizeof(mu_Context));
+  mu_init(ctx);
+  ctx->text_width = text_width ;
+  ctx->text_height = text_height;
+  ctx->style->font = ren_load_font("assets/fonts/font.ttf",14);
 }
 RenColor color = {.r=255,.b=0,.g=0,.a=255};
 RenRect window_rect = {0};
@@ -231,18 +515,36 @@ int mouse_state[3] = {0};
 void application_update(fenster_window* f){
     window_rect.width = f->width;
     window_rect.height = f->height;
-    int has_keys = 0;
-    char s[32] = {0};
-    char *p = s;
-    for (int i = 0; i < 128; i++) {
-      if (f->keys[i]) {
-        has_keys = 1;
-        *p++ = i;
-        keys_state[i] = !keys_state[i];
+    int max = 32;
+    for (int i = 0; i < max; i++) {
+      if (keys_state[i] != f->keys[i]) {
+        keys_state[i] = f->keys[i];
+        if(keys_state[i]){
+          mu_input_keydown(ctx,key_conversion[i]);
+        }
+        else{
+          mu_input_keyup(ctx,key_conversion[i]);
+        }
       }
+      // if(i == 31){
+      //   i = 90;
+      //   max = 97;
+      // }
+      // if( i == 96){
+      //   i = 122;
+      //   max = 128;
+      // }
     }
-    *p = '\0';
-    printf("%s",s);
+    size_t len = strlen((char*)&f->keys[128]);
+    if(len > 0){
+      char tex[32] = {0};
+      for(int i = 0; i < len;++i){
+        int key = f->keys[128+i];
+        tex[i] = key;
+      }
+      printf("%s\n",tex);
+      mu_input_text(ctx,tex);
+    }
     int left_down = (f->mouse >> MOUSE_LEFT_BUTTON) & 1;
     int middle_down = (f->mouse >> MOUSE_MIDDLE_BUTTON) & 1;
     int right_down = (f->mouse >> MOUSE_RIGHT_BUTTON) & 1;
@@ -296,10 +598,10 @@ void application_update(fenster_window* f){
             if(cmd->icon.id < 5){
               static RenImage imgs[] = {
                 {0},
-                {.pixels=icon_close_pixels,.width=icon_close_width,.height=icon_close_height},
-                {.pixels=icon_close_pixels,.width=icon_close_width,.height=icon_close_height},
-                {.pixels=icon_collapsed_pixels,.width=icon_collapsed_width,.height=icon_collapsed_height},
-                {.pixels=icon_expanded_pixels,.width=icon_expanded_width,.height=icon_expanded_height},
+                {.pixels=(RenColor*)icon_close_pixels,.width=icon_close_width,.height=icon_close_height},
+                {.pixels=(RenColor*)icon_close_pixels,.width=icon_close_width,.height=icon_close_height},
+                {.pixels=(RenColor*)icon_collapsed_pixels,.width=icon_collapsed_width,.height=icon_collapsed_height},
+                {.pixels=(RenColor*)icon_expanded_pixels,.width=icon_expanded_width,.height=icon_expanded_height},
               };
               RenImage img = imgs[cmd->icon.id];
               RenRect sub = {0,0,img.width,img.height};

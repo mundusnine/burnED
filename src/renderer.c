@@ -217,15 +217,18 @@ int ren_get_font_tab_width(RenFont *font) {
 }
 
 
-int ren_get_font_width(RenFont *font, const char *text) {
+int ren_get_font_width(RenFont *font, const char *text,size_t len) {
+  if(len == -1) len = strlen(text);
   int x = 0;
   const char *p = text;
   unsigned codepoint;
-  while (*p) {
+  int i =0;
+  while (*p && i < len) {
     p = utf8_to_codepoint(p, &codepoint);
     GlyphSet *set = get_glyphset(font, codepoint);
     stbtt_bakedchar *g = &set->glyphs[codepoint & 0xff];
     x += g->xadvance;
+    i++;
   }
   return x;
 }
