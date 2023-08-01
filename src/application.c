@@ -282,7 +282,19 @@ typedef struct {
 }
 data_text_t;
 
-int mu_multiline_textbox_ex(mu_Context *ctx, char *buf, int bufsz, int opt) {
+typedef struct {
+  mu_Vec2 m_pos;
+  int x_offset;
+  int y_offset;
+  float waitTime[2];
+} textbox_state_t;
+
+#define ARROW_U 17
+#define ARROW_D 18
+#define ARROW_R 19
+#define ARROW_L 20
+#define WAIT_TIME 1.0f
+int mu_multiline_textbox_ex(mu_Context *ctx, char *buf, int bufsz,textbox_state_t* state, int opt) {
   mu_Container* cnt = mu_get_current_container(ctx);
   char *start, *end, *p = buf;
   int width = -1;
@@ -326,11 +338,81 @@ int mu_multiline_textbox_ex(mu_Context *ctx, char *buf, int bufsz, int opt) {
   int res =0;
   mu_update_control(ctx, id, init_rect, opt | MU_OPT_HOLDFOCUS);
   mu_draw_control_frame(ctx, id, init_rect, MU_COLOR_BASE, opt);
+  int isXTimerFinished = state->waitTime[0] <= 0;
+  int isYTimerFinished = state->waitTime[1] <= 0;
   for(int i =0; i < d_len;++i){
     data_text_t node = data[i];
     mu_Rect r = node.r; 
     if (ctx->focus == id) {
-      static mu_Vec2 m_pos = {0};
+      /*handle arrows keys*/
+      if(ctx->key_down == ARROW_L && i ==0 && isXTimerFinished){
+        state->x_offset = -1;
+      }
+      if(ctx->key_down == ARROW_R && i ==0 && isXTimerFinished){
+        state->x_offset = 1;
+      }
+      if(ctx->key_down == ARROW_U && i ==0 && isYTimerFinished){
+        state->y_offset = -1;
+      }
+      if(ctx->key_down == ARROW_D && i ==0 && isYTimerFinished){
+        state->y_offset = 1;
+      }
+
+      if(ctx->mouse_down){
+        state->m_pos = ctx->mouse_pos;
+      }
+      if(state->m_pos.y > r.y && state->m_pos.y < r.y + r.h + ctx->style->spacing){
+        state->m_pos.y = r.y;
+      }
+      int isCurrentLine = r.y == state->m_pos.y;
+
+      int offsetx = state->m_pos.x - r.x;
+      int width = 0;
+      const float timer_add[2] = {0.25f,0.2f};
+
+      /*Timer for cursor movement*/
+      if(state->waitTime[0] > 0 && isCurrentLine){
+        state->waitTime[0] -= timer_add[0];
+        state->x_offset = 0;
+      }
+      if(state->waitTime[1] > 0 && i ==0){
+        state->waitTime[1] -= timer_add[1];
+        state->y_offset = 0;
+      }
+
+      char * curPos = node.text;
+      /*Move cursor to position and in 4 directions*/
+      {
+        int i =0;
+        for(; i < node.len;++i){
+          char temp[2] = {0};
+          temp[0] = node.text[i];
+          int nwidth = ctx->text_width(font, temp,1); 
+          if(offsetx < width + nwidth){
+            offsetx = width;
+            break;
+          }
+          width+= nwidth;
+        }
+        curPos = &node.text[i];
+        if(state->x_offset != 0 && isXTimerFinished && isCurrentLine){
+          char temp[2] = {0};
+          temp[0] = node.text[i + state->x_offset];
+          curPos = &node.text[i + state->x_offset];
+          int wc = ctx->text_width(font, temp,1);
+          state->m_pos.x += state->x_offset >0 ? wc : -wc;
+          state->x_offset = 0;
+          state->waitTime[0] = WAIT_TIME;
+        }
+        if(state->y_offset != 0 && isYTimerFinished && isCurrentLine){
+          int wc = r.h+ctx->style->spacing;//ctx->text_height(font);
+          if((state->y_offset < 0 && state->m_pos.y - wc >= init_rect.y) || (state->y_offset >0 && state->m_pos.y + wc < init_rect.y + init_rect.h))
+            state->m_pos.y += state->y_offset >0 ? wc : -wc;
+          state->y_offset = 0;
+          state->waitTime[1] = WAIT_TIME;
+        }
+      }
+
       /* handle text input */
       int len = strlen(buf);
       int n = mu_min(bufsz - len - 1, (int) strlen(ctx->input_text));
@@ -340,37 +422,26 @@ int mu_multiline_textbox_ex(mu_Context *ctx, char *buf, int bufsz, int opt) {
         buf[len] = '\0';
         res |= MU_RES_CHANGE;
       }
+
       /* handle backspace */
-      if (ctx->key_pressed & MU_KEY_BACKSPACE && len > 0) {
+      len = node.len;
+      if (ctx->key_pressed & MU_KEY_BACKSPACE && len > 0 && isCurrentLine) {
         /* skip utf-8 continuation bytes */
         while ((buf[--len] & 0xc0) == 0x80 && len > 0);
+
         buf[len] = '\0';
         res |= MU_RES_CHANGE;
       }
       /* handle return */
-      if (ctx->key_pressed & MU_KEY_RETURN) {
+      if (ctx->key_pressed & MU_KEY_RETURN && ctx->key_pressed == MU_KEY_RETURN) {
         mu_set_focus(ctx, 0);
         res |= MU_RES_SUBMIT;
       }
 
-      if(ctx->mouse_down){
-        m_pos = ctx->mouse_pos;
-      }
       mu_Color color = ctx->style->colors[MU_COLOR_TEXT];
       mu_Font font = ctx->style->font;
       int textw = ctx->text_width(font, node.text,node.len);
-      int offsetx = m_pos.x - r.x;
-      int width = 0;
-      for(int i =0; i < node.len;++i){
-        char temp[2] = {0};
-        temp[0] = node.text[i];
-        int nwidth = ctx->text_width(font, temp,1); 
-        if(offsetx < width+ nwidth){
-          offsetx = width;
-          break;
-        }
-        width+= nwidth;
-      }
+
       offsetx = textw < offsetx ? textw : offsetx;
       int texth = ctx->text_height(font);
       int ofx = r.w - textw - 1;
@@ -378,7 +449,7 @@ int mu_multiline_textbox_ex(mu_Context *ctx, char *buf, int bufsz, int opt) {
       int texty = r.y + (r.h - texth) / 2;
       mu_push_clip_rect(ctx, r);
       mu_draw_text(ctx, font, node.text, node.len, mu_vec2(textx, texty), color);
-      if(r.x + r.w > m_pos.x && r.x <= m_pos.x && r.y <= m_pos.y && r.y + r.h > m_pos.y){
+      if(r.x + r.w > state->m_pos.x && r.x <= state->m_pos.x && r.y <= state->m_pos.y && r.y + r.h > state->m_pos.y){
         mu_draw_rect(ctx, mu_rect(textx + offsetx, texty, 1, texth), color);
       } 
       mu_pop_clip_rect(ctx);
@@ -454,7 +525,8 @@ int mu_multiline_textbox_ex(mu_Context *ctx, char *buf, int bufsz, int opt) {
 static char* lorem_text = NULL;
 static void texteditor_window(mu_Context *ctx){
   if (mu_begin_window(ctx, "Text Editor", mu_rect(650, 250, 300, 240))){
-    mu_multiline_textbox_ex(ctx,lorem_text,sizeof(char) * 2048 *2,0);
+    static textbox_state_t state = {0};
+    mu_multiline_textbox_ex(ctx,lorem_text,sizeof(char) * 2048 *2,&state,0);
     mu_end_window(ctx);
   }
 }
@@ -526,14 +598,6 @@ void application_update(fenster_window* f){
           mu_input_keyup(ctx,key_conversion[i]);
         }
       }
-      // if(i == 31){
-      //   i = 90;
-      //   max = 97;
-      // }
-      // if( i == 96){
-      //   i = 122;
-      //   max = 128;
-      // }
     }
     size_t len = strlen((char*)&f->keys[128]);
     if(len > 0){

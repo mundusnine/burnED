@@ -22,6 +22,9 @@
         "format": "c",
         "limits": "c",
         "stdexcept": "c",
-        "regex": "c"
+        "regex": "c",
+        "*.rh": "c",
+        "cstdlib": "c",
+        "__node_handle": "c"
     }
 }

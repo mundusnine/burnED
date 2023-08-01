@@ -31,8 +31,14 @@ int main(int argc,char** argv){
     fenster_open(&f);
     ren_init(&f);
     application_init();
+    int64_t now = 0;
     while (fenster_loop(&f) == 0) {
         application_update(&f);
+        int64_t time = fenster_time();
+        if (time - now < 1000 / 60) {
+            fenster_sleep(time - now);
+        }
+        now = time;
     }
     
     fenster_close(&f);
